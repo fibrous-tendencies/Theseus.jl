@@ -1,4 +1,4 @@
-module Ariadne
+module Theseus
 
 using LinearAlgebra
 using Statistics
