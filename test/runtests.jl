@@ -2,5 +2,5 @@ using Theseus
 using Test
 
 @testset "Theseus.jl" begin
-    # Write your tests here.
+    @test true == true
 end

@@ -1,8 +1,8 @@
 struct Objective
-    ID::String
-    W::Union{Float64, Int64}
-    Indices::Union{Vector{Int64}, UnitRange{Int64}, Int64}
-    Values::Union{Vector{Float64}, Matrix{Float64}, Float64}
+    ID::Int64
+    W::Float64
+    Indices::Union{Vector{Int64}, Int64}
+    Values::Union{Vector{Float64}, Matrix{Float64}, Float64, Nothing}
 
     function Objective(obj::Dict, ne::Int64, nn::Int64, N, F)
         id = obj["OBJID"]
@@ -10,12 +10,12 @@ struct Objective
 
         #If the objective is a global objective, then the indices are -1
         if  obj["Indices"][1] == -1
-            if id in ["Target"]
+            if id == 1
                 indices = N
-            elseif id in ["Anchor"]
+            elseif id == 0
                 indices = F
             else
-                indices = range(1, ne)
+                indices = collect(Int64, range(1, ne))
             end        
         else
             indices = Int64.(obj["Indices"]) .+ 1
@@ -121,7 +121,7 @@ end
 struct Receiver
 
     #FORCE DENSITY
-    Q::Union{Vector{Float64}, Vector{Int64}}
+    Q::Vector{Float64}
 
     #NETWORK INFORMATION
     N::Vector{Int64}
@@ -148,6 +148,7 @@ struct Receiver
         xyzf = problem["XYZf"]
         xyzf = reduce(hcat, xyzf)
         xyzf = convert(Matrix{Float64}, xyzf')
+        println(xyzf)
 
         # global info
         ne = Int(problem["Network"]["Graph"]["Ne"])
@@ -163,15 +164,18 @@ struct Receiver
         end        
 
         # free/fixed
-        N = Int.(problem["Network"]["Free"]) .+ 1
+        N = Int.(problem["Network"]["FreeNodes"]) .+ 1
         N = collect(range(1, length = length(N)))
-        F = Int.(problem["Network"]["Fixed"]) .+ 1 
+        F = Int.(problem["Network"]["FixedNodes"]) .+ 1 
         F = collect(range(length(N)+1, length = length(F)))   
 
         # loads
         GH_p = problem["P"]
+        println(GH_p)       
         GH_p = reduce(hcat, GH_p)
+        println(GH_p)
         GH_p = convert(Matrix{Float64}, GH_p')
+        println(GH_p)
 
         LN = Int[]
         # load nodes
@@ -227,7 +231,7 @@ struct Receiver
         end
 
         if haskey(problem, "VariableAnchors")
-            varAnchors = problem["VariableAnchorIndices"]
+            varAnchors = problem["NodeIndex"]
             fixAnchors = problem["FixedAnchorIndices"]
             ap = AnchorParameters(problem["VariableAnchors"], varAnchors, fixAnchors)
         else

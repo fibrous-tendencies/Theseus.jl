@@ -2,12 +2,19 @@
 ### optimiztaion
 function FDMoptim!(receiver, ws)
 
-        sp_init = collect(range(1, length = receiver.ne))
+        sp_init = collect(Int64, range(1, length = receiver.ne))
 
         # objective function
         if receiver.Params == "None" || isnothing(receiver.Params.Objectives) || isempty(receiver.Params.Objectives)
 
             println("SOLVING")
+
+            println("Q size: ", size(receiver.Q),
+                    "Cn size: ",size(receiver.Cn), 
+                    "Cf size: ", size(receiver.Cf), 
+                    "Pn size: ", size(receiver.Pn), 
+                    "XYZf size: ", size(receiver.XYZf),
+                    "sp_init size: ", size(sp_init))
 
             xyznew = solve_explicit(receiver.Q, receiver.Cn, receiver.Cf, receiver.Pn, receiver.XYZf, sp_init)
 
@@ -32,8 +39,13 @@ function FDMoptim!(receiver, ws)
             
             println("OPTIMIZING")
 
+            #trace
             Q = []
-            NodeTrace = []   
+            NodeTrace = []
+            
+            i = 0
+            iters = Vector{Vector{Float64}}()
+            losses = Vector{Float64}()
 
             """
             Objective function, returns a scalar loss value wrt the parameters.
@@ -55,9 +67,11 @@ function FDMoptim!(receiver, ws)
 
                 if !isderiving()
                     ignore_derivatives() do
+                        Q = deepcopy(q)
                         if receiver.Params.NodeTrace == true
                             push!(NodeTrace, deepcopy(xyzfull))
-                        end                    
+                        end
+                        
                     end
                 end
 
@@ -66,43 +80,59 @@ function FDMoptim!(receiver, ws)
                 return loss
             end          
 
-            function obj(q)                
+            function obj(q)           
 
                 xyznew = solve_explicit(q, receiver.Cn, receiver.Cf, receiver.Pn, receiver.XYZf, sp_init)
                 
-                xyz = vcat(xyznew, receiver.XYZf)  
+                xyzfull = vcat(xyznew, receiver.XYZf)  
                 
-                lengths = norm.(eachrow(receiver.C * xyz))
+                lengths = norm.(eachrow(receiver.C * xyzfull))
                 forces = q .* lengths        
 
                 loss = lossFunc(xyznew, lengths, forces, receiver, q)
 
                 if !isderiving()
                     ignore_derivatives() do
+                        Q = deepcopy(q)
                         if receiver.Params.NodeTrace == true
-                            push!(NodeTrace, deepcopy(xyz))
-                        end                    
+                            push!(NodeTrace, deepcopy(xyzfull))
+                        end
+
+                        i += 1
+
+                        if receiver.Params.Show && i % receiver.Params.Freq == 0
+                            push!(iters, deepcopy(Q))
+                            push!(losses, loss)
+        
+                            #send intermediate message
+                            msgout = Dict("Finished" => false,
+                                "Iter" => i, 
+                                "Loss" => loss,
+                                "Q" => Q, 
+                                "X" => last(NodeTrace)[:,1], 
+                                "Y" => last(NodeTrace)[:,2], 
+                                "Z" => last(NodeTrace)[:,3],
+                                "Losstrace" => losses)
+                                
+                            WebSockets.send(ws, json(msgout))
+                            println("Iteration $i")
+                        end
                     end
                 end
                 
                 return loss
             end
 
-            #trace
-            i = 0
-            iters = Vector{Vector{Float64}}()
-            losses = Vector{Float64}()
+            
 
             #callback function
             function cb(loss)
-                 i += 1
 
                  if cancel == true
                     global cancel = false
-                    return true
-                 end               
-
-                if receiver.Params.Show && x.iteration % receiver.Params.Freq == 0
+                    return true     
+                
+                if receiver.Params.Show 
                     push!(iters, deepcopy(Q))
                     push!(losses, loss.value)
 
@@ -119,9 +149,11 @@ function FDMoptim!(receiver, ws)
                     WebSockets.send(ws, json(msgout))
                     println("Iteration $i")
                     return false
-                else
+                    end
+                else      
                     return false
                 end
+
             end
 
             """
@@ -131,7 +163,7 @@ function FDMoptim!(receiver, ws)
             function g!(G, θ)
                 grad = gradient(θ) do q
                    obj(q)
-                end 
+                end
                 G .= grad[1]
             end
             
@@ -156,11 +188,12 @@ function FDMoptim!(receiver, ws)
                 obj, 
                 g!,
                 parameters,
-                LBFGS(),
+                LBFGS(),                
                 Optim.Options(
                     iterations = receiver.Params.MaxIter,
                     f_tol = receiver.Params.RelTol,
                     callback = cb,
+                    show_every = receiver.Params.Freq,
                     ))            
 
             min = Optim.minimizer(res)

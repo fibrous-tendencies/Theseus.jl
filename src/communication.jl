@@ -51,7 +51,7 @@ function readMSG(msg, ws)
         end
 
         # ANALYSIS
-        #try
+        try
             # DESERIALIZE MESSAGE
             @time problem = JSON.parse(msg)
 
@@ -71,11 +71,11 @@ function readMSG(msg, ws)
             global simulating = true
             @time FDMoptim!(receiver, ws)
            
-        #catch error
-        #    println("INVALID INPUT")
-        #    println("CHECK PARAMETER BOUNDS")
-        #    println(error)
-        #end
+        catch error
+            println("INVALID INPUT")
+            println("CHECK PARAMETER BOUNDS")
+           println(error)
+        end
         
         println("DONE")
         global simulating = false

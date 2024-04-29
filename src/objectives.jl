@@ -23,40 +23,37 @@ end
 """
 Compute the maximum and minimum lengths of the edges in the network using softmax and softmin dotted with the edge lengths.
 """
-function lenVar(x::Vector{Float64}, indices::Union{Vector{Int64}, UnitRange{Int64}})
+function lenVar(x::Vector{Float64}, indices::Vector{Int64})
     x = x[indices]
-    max = x' * softmax(x)
-    min = x' * softmin(x)
-    max - min
+    -reduce(-, extrema(x))
 end
 
 """
 Reduce the difference between the maximum and minimum forces in the network.
 From Schek theorem 2. 
 """
-function forceVar(x::Vector{Float64}, indices::Union{Vector{Int64}, UnitRange{Int64}})
+function forceVar(x::Vector{Float64}, indices::Vector{Int64})
     x = x[indices]
-    sum(x)
-    #-reduce(-, extrema(x))
+    -reduce(-, extrema(x))
 end
 
 """
 Minimize the difference between the form found lengths of the edges and the target lengths.
 """
 
-function lenTarget(lengths::Vector{Float64}, values::Vector{Float64}, indices::Union{Vector{Int64}, UnitRange{Int64}})
+function lenTarget(lengths::Vector{Float64}, values::Vector{Float64}, indices::Vector{Int64})
     sum((lengths[indices] - values).^2)
 end
 
 """
 Penalizes values in vector that are below a threshold 
 """
-function minPenalty(x::Vector{Float64}, values::Union{Vector{Float64},Float64}, indices::Union{Vector{Int64}, UnitRange{Int64}})
+function minPenalty(x::Vector{Float64}, values::Union{Vector{Float64},Float64}, indices::Vector{Int64})
     x = x[indices]
     sum(softplus.(-x .- values))
 end
 
-function minPenalty(x::Vector{Float64}, values::Union{Vector{Float64},Float64}, indices::Union{Vector{Int64}, UnitRange{Int64}}, k::Union{Float64,Int64})
+function minPenalty(x::Vector{Float64}, values::Union{Vector{Float64},Float64}, indices::Vector{Int64}, k::Union{Float64,Int64})
     x = x[indices]
     sum(softplus.((x - values), k))
 end
@@ -65,10 +62,10 @@ end
 Penalizes values in vector that are above a threshold 
 """
 
-function maxPenalty(x::Vector{Float64}, values::Union{Vector{Float64},Float64}, indices::Union{Vector{Int64}, UnitRange{Int64}})
+function maxPenalty(x::Vector{Float64}, values::Union{Vector{Float64},Float64}, indices::Vector{Int64})
     minPenalty(-x, values, indices)
 end
-function maxPenalty(x::Vector{Float64}, values::Union{Vector{Float64},Float64}, indices::Union{Vector{Int64}, UnitRange{Int64}}, k::Union{Float64,Int64})
+function maxPenalty(x::Vector{Float64}, values::Union{Vector{Float64},Float64}, indices::Vector{Int64}, k::Union{Float64,Int64})
     minPenalty(-x, values, indices, k)
 end
 

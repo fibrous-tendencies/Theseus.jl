@@ -11,8 +11,8 @@ function solve_explicit(
     Cf::SparseMatrixCSC{Int64,Int64}, #Index matrix of fixed nodes
     Pn::Matrix{Float64}, #Matrix of free node loads
     Nf::Matrix{Float64}, #Matrix of fixed node positions
-    sp_init #Intialization for sparse matrix
-    ) 
+    sp_init::Vector{Int64} #Intialization for sparse matrix
+    )
 
     Q = sparse(sp_init,sp_init,q) # build diagonal force density Matrix
 
