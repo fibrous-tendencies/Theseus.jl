@@ -2,7 +2,7 @@ cancel = false
 simulating = false
 counter = 0
 
-function FDMsolve!(;host = "127.0.0.1", port = 2000)
+function start!(;host = "127.0.0.1", port = 2000)
     #start server
     println("###############################################")
     println("###############SERVER OPENED###################")
@@ -11,20 +11,13 @@ function FDMsolve!(;host = "127.0.0.1", port = 2000)
     ## PERSISTENT LOOP
     WebSockets.listen!(host, port) do ws
         # FOR EACH MESSAGE SENT FROM CLIENT
-        """
+        
         for msg in ws
             try
             @async readMSG(msg, ws)
             catch error
                 println(error)
             end
-        """
-
-        for msg in ws
-            
-             readMSG(msg, ws)
-
-            
         end
     end
 end
@@ -53,17 +46,17 @@ function readMSG(msg, ws)
         # ANALYSIS
         try
             # DESERIALIZE MESSAGE
-            @time problem = JSON.parse(msg)
+            problem = JSON.parse(msg)
 
             # MAIN ALGORITHM
             println("READING DATA")
 
             # CONVERT MESSAGE TO RECEIVER TYPE
-            @time receiver = Receiver(problem)
+            receiver = Receiver(problem)
 
             # SOLVE
             if counter == 0
-                println("First run will take a while! :--)")
+                println("First run will take a while.")
                 println("Julia needs to compile the code for the first run.")
             end
             
@@ -74,7 +67,7 @@ function readMSG(msg, ws)
         catch error
             println("INVALID INPUT")
             println("CHECK PARAMETER BOUNDS")
-           println(error)
+            println(error)
         end
         
         println("DONE")

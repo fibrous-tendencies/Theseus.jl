@@ -137,9 +137,9 @@ struct Receiver
     ne::Int64
     nn::Int64
 
-    Params::Union{Parameters, String}
+    Params::Union{Parameters, Nothing}
     
-    AnchorParams::Union{AnchorParameters, String}
+    AnchorParams::Union{AnchorParameters, Nothing}
 
 
     #constructor
@@ -148,7 +148,6 @@ struct Receiver
         xyzf = problem["XYZf"]
         xyzf = reduce(hcat, xyzf)
         xyzf = convert(Matrix{Float64}, xyzf')
-        println(xyzf)
 
         # global info
         ne = Int(problem["Network"]["Graph"]["Ne"])
@@ -171,11 +170,8 @@ struct Receiver
 
         # loads
         GH_p = problem["P"]
-        println(GH_p)       
         GH_p = reduce(hcat, GH_p)
-        println(GH_p)
         GH_p = convert(Matrix{Float64}, GH_p')
-        println(GH_p)
 
         LN = Int[]
         # load nodes
@@ -219,7 +215,6 @@ struct Receiver
         Cf = C[:, length(N)+1:end]
 
         if haskey(problem, "Parameters")
-            params = problem["Parameters"]
             p = Parameters(problem["Parameters"], ne, nn, N, F)
 
             #prevent the force densities from being outside the bounds
@@ -227,7 +222,7 @@ struct Receiver
         else
             println("No optimization parameters provided.")
             println("Running FDM using given force densities only.")
-            p = "None"
+            p = nothing
         end
 
         if haskey(problem, "VariableAnchors")
@@ -237,7 +232,7 @@ struct Receiver
         else
             println("No anchor parameters provided.")
             println("Using only given fixed node positions.")
-            ap = "None"
+            ap = nothing
         end
 
         

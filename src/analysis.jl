@@ -1,3 +1,4 @@
+import HTTP.WebSockets
 
 ### optimiztaion
 function FDMoptim!(receiver, ws)
@@ -5,16 +6,9 @@ function FDMoptim!(receiver, ws)
         sp_init = collect(Int64, range(1, length = receiver.ne))
 
         # objective function
-        if receiver.Params == "None" || isnothing(receiver.Params.Objectives) || isempty(receiver.Params.Objectives)
+        if isnothing(receiver.Params) || isnothing(receiver.Params.Objectives) || isempty(receiver.Params.Objectives)
 
             println("SOLVING")
-
-            println("Q size: ", size(receiver.Q),
-                    "Cn size: ",size(receiver.Cn), 
-                    "Cf size: ", size(receiver.Cf), 
-                    "Pn size: ", size(receiver.Pn), 
-                    "XYZf size: ", size(receiver.XYZf),
-                    "sp_init size: ", size(sp_init))
 
             xyznew = solve_explicit(receiver.Q, receiver.Cn, receiver.Cf, receiver.Pn, receiver.XYZf, sp_init)
 
@@ -34,7 +28,7 @@ function FDMoptim!(receiver, ws)
             HTTP.WebSockets.send(ws, json(msgout))
             
         else
-            #try
+            try
                 
             
             println("OPTIMIZING")
@@ -114,8 +108,7 @@ function FDMoptim!(receiver, ws)
                                 "Z" => last(NodeTrace)[:,3],
                                 "Losstrace" => losses)
                                 
-                            WebSockets.send(ws, json(msgout))
-                            println("Iteration $i")
+                            HTTP.WebSockets.send(ws, json(msgout))
                         end
                     end
                 end
@@ -146,8 +139,7 @@ function FDMoptim!(receiver, ws)
                         "Z" => last(NodeTrace)[:,3],
                         "Losstrace" => losses)
                         
-                    WebSockets.send(ws, json(msgout))
-                    println("Iteration $i")
+                    HTTP.WebSockets.send(ws, json(msgout))
                     return false
                     end
                 else      
@@ -177,7 +169,7 @@ function FDMoptim!(receiver, ws)
             """
             Optimization
             """
-            if receiver.AnchorParams == "None"
+            if isnothing(receiver.AnchorParams)
                 obj = obj
                 parameters = receiver.Q
             else
@@ -192,12 +184,9 @@ function FDMoptim!(receiver, ws)
                 Optim.Options(
                     iterations = receiver.Params.MaxIter,
                     f_tol = receiver.Params.RelTol,
-                    callback = cb,
-                    show_every = receiver.Params.Freq,
                     ))            
 
             min = Optim.minimizer(res)
-
     
             println("------------------------------------")
             println("Optimizer: ", summary(res))
@@ -207,8 +196,8 @@ function FDMoptim!(receiver, ws)
 
             println("SOLUTION FOUND")
             # PARSING SOLUTION
-            if receiver.AnchorParams == "None"
-                xyz_final = @time solve_explicit(min, receiver.Cn, receiver.Cf, receiver.Pn, receiver.XYZf, sp_init)
+            if isnothing(receiver.AnchorParams)
+                xyz_final = solve_explicit(min, receiver.Cn, receiver.Cf, receiver.Pn, receiver.XYZf, sp_init)
                 xyz_final = vcat(xyz_final, receiver.XYZf)
             else
                 newXYZf = reshape(min[receiver.ne+1:end], (:, 3))
@@ -217,8 +206,6 @@ function FDMoptim!(receiver, ws)
                 xyz_final = solve_explicit(min[1:receiver.ne], receiver.Cn, receiver.Cf, receiver.Pn, XYZf_final, sp_init)
                 xyz_final = vcat(xyz_final, XYZf_final)
             end
-
-            #println(NodeTrace)
 
 
             msgout = Dict("Finished" => true,
@@ -232,10 +219,10 @@ function FDMoptim!(receiver, ws)
                 "NodeTrace" => NodeTrace)
 
 
-        WebSockets.send(ws, json(msgout))
+        HTTP.WebSockets.send(ws, json(msgout))
 
-        #catch error
-        #    println(error)
-        #end
+        catch error
+            println(error)
+        end
     end
 end

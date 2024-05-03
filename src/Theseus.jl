@@ -6,8 +6,8 @@ using SparseArrays
 using Optim
 using Zygote
 using Zygote: @adjoint
-using HTTP
 using JSON
+using HTTP
 using LineSearches
 using ChainRulesCore
 
@@ -20,6 +20,6 @@ include("objectives.jl")
 include("adjoint.jl")
 include("anchors.jl")
 
-export FDMsolve!
+export start!
 
 end # module FDMremote
