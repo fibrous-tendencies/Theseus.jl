@@ -6,7 +6,7 @@ Theseus is a [Julia](https://julialang.org/) package for form-finding and optimi
 
 ## Installation
 
-Installation of Theseus requires the Julia REPL which can be downloaded from [here](https://julialang.org/downloads/). Theseus was developed using Julia 1.9.3. Theseus is not yet registered in the Julia package registry. Even if you do not plan on using the Julia REPL for anything else it is generally recommended that you create a new environment. This is similar to environments when using conda for Python development. On Windows you may need to run the Julia REPL. 
+Installation of Theseus requires the Julia REPL which can be downloaded from [here](https://julialang.org/downloads/). Theseus was developed using Julia 1.9.3. Theseus is not registered in the Julia package registry so you will need to install it using the directions below. Even if you do not plan on using the Julia REPL for anything else it is generally recommended that you create a new environment. This is similar to environments when using conda for Python development. On Windows you may need to run the Julia REPL. 
 
 To create a new environment in Julia, open the REPL that you just installed. Enter package mode by typing:
 ```julia
