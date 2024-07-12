@@ -95,18 +95,31 @@ function FDMoptim!(receiver, ws)
                         i += 1
 
                         if receiver.Params.Show && i % receiver.Params.Freq == 0
-                            push!(iters, deepcopy(Q))
+                            
+                            push!(iters, Q)
                             push!(losses, loss)
-        
-                            #send intermediate message
-                            msgout = Dict("Finished" => false,
-                                "Iter" => i, 
-                                "Loss" => loss,
-                                "Q" => Q, 
-                                "X" => last(NodeTrace)[:,1], 
-                                "Y" => last(NodeTrace)[:,2], 
-                                "Z" => last(NodeTrace)[:,3],
-                                "Losstrace" => losses)
+
+
+                            if receiver.Params.NodeTrace == true
+                                #send intermediate message
+                                msgout = Dict("Finished" => false,
+                                    "Iter" => i, 
+                                    "Loss" => loss,
+                                    "Q" => Q, 
+                                    "X" => last(NodeTrace)[:,1], 
+                                    "Y" => last(NodeTrace)[:,2], 
+                                    "Z" => last(NodeTrace)[:,3],
+                                    "Losstrace" => losses)
+                            else
+                                msgout = Dict("Finished" => false,
+                                    "Iter" => i, 
+                                    "Loss" => loss,
+                                    "Q" => Q, 
+                                    "X" => xyzfull[:,1], 
+                                    "Y" => xyzfull[:,2], 
+                                    "Z" => xyzfull[:,3],
+                                    "Losstrace" => losses)
+                            end
                                 
                             HTTP.WebSockets.send(ws, json(msgout))
                         end
@@ -163,7 +176,7 @@ function FDMoptim!(receiver, ws)
             #to use when draping only
             function drape!(G, θ)
                 grad = nothing
-                G .= grad[2]
+                G .= grad[1]
             end
 
             """
