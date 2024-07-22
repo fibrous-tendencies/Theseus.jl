@@ -19,3 +19,26 @@ function solve_explicit(
     return (Cn' * Q * Cn) \ (Pn - Cn' * Q * Cf * Nf)
 end
 
+
+
+function optimize_FDM(
+    q::Vector{Float64}, 
+    grad::Vector{Float64}, 
+    iter::{Int64},
+    rel_tol::{Float64},
+    abs_tol::{Float64},
+     )
+
+     xyz = nothing
+
+     return xyz
+end
+
+```
+Constrained line search to ensure sign never flips 
+````
+function linesearch_FDM()
+end
+
+
+
