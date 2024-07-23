@@ -81,7 +81,9 @@ function FDMoptim!(receiver, ws)
                 xyzfull = vcat(xyznew, receiver.XYZf)  
                 
                 lengths = norm.(eachrow(receiver.C * xyzfull))
-                forces = q .* lengths        
+                forces = q .* lengths    
+                
+                
 
                 loss = lossFunc(xyznew, lengths, forces, receiver, q)
 
