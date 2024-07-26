@@ -13,11 +13,11 @@ function start!(;host = "127.0.0.1", port = 2000)
         # FOR EACH MESSAGE SENT FROM CLIENT
         
         for msg in ws
-            try
-            @async readMSG(msg, ws)
-            catch error
-                println(error)
-            end
+            #try
+            readMSG(msg, ws)
+            #catch error
+            #    println(error)
+            #end
         end
     end
 end
@@ -44,7 +44,7 @@ function readMSG(msg, ws)
         end
 
         # ANALYSIS
-        try
+        #try
             # DESERIALIZE MESSAGE
             problem = JSON.parse(msg)
 
@@ -64,11 +64,11 @@ function readMSG(msg, ws)
             global simulating = true
             @time FDMoptim!(receiver, ws)
            
-        catch error
-            println("INVALID INPUT")
-            println("CHECK PARAMETER BOUNDS")
-            println(error)
-        end
+        #catch error
+        #    println("INVALID INPUT")
+        #    println("CHECK PARAMETER BOUNDS")
+        #    println(error)
+        #end
         
         println("DONE")
         global simulating = false

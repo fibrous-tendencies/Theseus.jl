@@ -25,7 +25,9 @@ Compute the maximum and minimum lengths of the edges in the network using softma
 """
 function lenVar(x::Vector{Float64}, indices::Vector{Int64})
     x = x[indices]
-    -reduce(-, extrema(x))
+    mean = sum(x) / length(x)
+    std = x .- mean
+    sum( std.^2 )
 end
 
 """
@@ -34,7 +36,9 @@ From Schek theorem 2.
 """
 function forceVar(x::Vector{Float64}, indices::Vector{Int64})
     x = x[indices]
-    -reduce(-, extrema(x))
+    mean = sum(x) / length(x)
+    std = x .- mean
+    sum( std.^2 )
 end
 
 """
