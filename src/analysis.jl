@@ -134,34 +134,46 @@ function FDMoptim!(receiver, ws)
             return armijo && curvature
         end
 
-        function gd_line_search(f, g, x, d, alpha0::Float64; max_iter=100, min_val=1e-8, tol=1e-6, c1=1e-4, c2=0.9)
+        function gd_line_search(f, g, x, d, alpha0::Float64; max_iter=100, min_val=1e-8, min_threshold=1e-4, tol=1e-6, c1=1e-4, c2=0.9)
             alpha = alpha0
-            best_alpha = alpha
             best_f_val = f(x)
+            x_test = x
 
             for _ in 1:max_iter
-                x_new = x .+ alpha .* d
-                if any(x_new .<= min_val)
-                    alpha /= 2.0
-                    best_alpha = alpha
+                x_test = x .+ alpha .* d
+                #If any values are made less than the minimum value by d
+                #Set direction for those to 0
+
+                if any(x_test .<= min_val)
+
+                    d_0 = d
+
+                    for (i, test_dir) in enumerate(x_test)
+                        if test_dir <= min_val
+                            d_0[i] = 0
+                        end
+                    end
+
+                    x_test = x .+ alpha .* d_0
+                    best_f_val = f(x_test)
+
+                    if wolfe_conditions(f, g, x_test, d_0, alpha)
+                        println("Masked Wolfe conditions met, alpha: ")
+                        return alpha, best_f_val, x_test
+                    else
+                        alpha /= 2.0
+                    end
                 else
-                    if wolfe_conditions(f, g, x_new, d, alpha)
-                        return best_alpha, best_f_val, x_new
+                    best_f_val = f(x_test)
+                    if wolfe_conditions(f, g, x_test, d, alpha)
+                        return alpha, best_f_val, x_test
                     else
                         alpha /= 2.0
                     end
                 end
             end
 
-            if any(x_new .<= min_val)
-                x_new = x 
-                best_f_val = f(x)
-            else
-                x_new = x .+ best_alpha .* d
-                best_f_val = f(x_new)
-            end
-
-            return best_alpha, best_f_val, x_new
+            return alpha, best_f_val, x_test
         end
 
         function gd_simple(f, x0::Vector{Float64}; max_iter::Int64 = 10, tol::Float64 = 1e-6, min_val::Float64 = 1e-8)

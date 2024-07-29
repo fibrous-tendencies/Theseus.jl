@@ -6,7 +6,7 @@
 function lossFunc(xyznew::Matrix{Float64}, lengths::Vector{Float64}, forces::Vector{Float64}, receiver::Receiver, q::Vector{Float64})
     loss = 0.0
     #Enforce parameter bounds on q to prevent negative values
-    #loss += pBounds(q, receiver.Params.LB, receiver.Params.UB)
+    loss += pBounds(q, receiver.Params.LB, receiver.Params.UB)
 
     #evaluate objective and return composite loss
     for obj in receiver.Params.Objectives
