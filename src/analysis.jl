@@ -134,7 +134,7 @@ function FDMoptim!(receiver, ws)
             return armijo && curvature
         end
 
-        function gd_line_search(f, g, x, d, alpha0::Float64; max_iter=100, min_val=1e-8, min_threshold=1e-4, tol=1e-6, c1=1e-4, c2=0.9)
+        function gd_line_search(f, g, x, d, alpha0::Float64; max_iter=20, min_val=1e-8, min_threshold=1e-4, tol=1e-6, c1=1e-4, c2=0.9)
             alpha = alpha0
             best_f_val = f(x)
             x_test = x
@@ -144,32 +144,25 @@ function FDMoptim!(receiver, ws)
                 #If any values are made less than the minimum value by d
                 #Set direction for those to 0
 
-                if any(x_test .<= min_val)
+                d_0 = d
 
-                    d_0 = d
+                x_clamp = x
 
-                    for (i, test_dir) in enumerate(x_test)
-                        if test_dir <= min_val
-                            d_0[i] = 0
-                        end
+                for (i, x) in enumerate(x_test)
+                    if x < min_val
+                        d_0[i] = 0
+                        x_clamp[i] = min_val
                     end
+                end
 
-                    x_test = x .+ alpha .* d_0
-                    best_f_val = f(x_test)
+                x_test = x_clamp .+ alpha .* d_0
+                best_f_val = f(x_test)
 
-                    if wolfe_conditions(f, g, x_test, d_0, alpha)
-                        println("Masked Wolfe conditions met, alpha: ")
-                        return alpha, best_f_val, x_test
-                    else
-                        alpha /= 2.0
-                    end
+                if wolfe_conditions(f, g, x_test, d_0, alpha)
+                    println("Masked Wolfe conditions met, alpha: ", alpha)
+                    return alpha, best_f_val, x_test
                 else
-                    best_f_val = f(x_test)
-                    if wolfe_conditions(f, g, x_test, d, alpha)
-                        return alpha, best_f_val, x_test
-                    else
-                        alpha /= 2.0
-                    end
+                    alpha /= 2.0
                 end
             end
 
