@@ -135,6 +135,7 @@ function FDMoptim!(receiver, ws)
         end
 
         function gd_line_search(f, g, x, d, alpha0::Float64; max_iter=20, min_val=1e-8, min_threshold=1e-4, tol=1e-6, c1=1e-4, c2=0.9)
+            #When we get to the line search our goal is to find a good step size that improves our solution 
             alpha = alpha0
             best_f_val = f(x)
             x_test = x
@@ -169,17 +170,35 @@ function FDMoptim!(receiver, ws)
             return alpha, best_f_val, x_test
         end
 
-        function gd_simple(f, x0::Vector{Float64}; max_iter::Int64 = 10, tol::Float64 = 1e-6, min_val::Float64 = 1e-8)
-            x = max.(x0, min_val)
-            fval = f(x)
-            g = x -> Zygote.gradient(f, x)[1]
-            gval = g(x)
-            k = 0
+        function gd_simple(f, q0::Vector{Float64}; max_iter::Int64 = 10, tol::Float64 = 1e-6, min_val::Float64 = 1e-8)
+            q = max.(q0, min_val) #Enfoce that the initial conditions are greater than min_val
+            fval = f(q) #Compute the initial loss value
+            g = q -> Zygote.gradient(f, q)[1] #Initalize the gradient of the loss function w.r.t. q
+            gval = g(q) #Get initial gradient w.r.t. inital x values
+            k = 0 #Counter set to 0
 
+
+            #= 
+            While the norm of the gradient is greater than 0 (i.e. global minimizer not found within some tolerance)
+            and max iterations have not been hit
+            =# 
             while norm(gval) > tol && k < max_iter
-                gval = g(x)
+                #Compute gradient w.r.t. q
+                #Is this redundant? 
+                gval = g(q)
+
+                #Normalize the gradient values and assign the negative gradient to d
+                #This will be our search direction for the line search
+                #The line search will look for a scaling factor, alpha, which will be used to take a step 
+                #In the direction of d. Importantly, this step should not make any of the q values negative.
+                #The sign change here is physically meaningful and converts an element to a member in compression. 
+    
                 d = -gval / maximum(abs.(gval))
-                best_alpha, fval_new, x_new = gd_line_search(f, g, x, d, 10.0; min_val=min_val)
+
+                #The line search takes in the function f [the objective function], g [gradient function],
+                #q values, d, initial alpha, and returns the best alpha from the line search, and a minimum value
+                #which is the lowest value of q that can be reached. 
+                best_alpha, fval_new, x_new = gd_line_search(f, g, q, d, 10.0; min_val=min_val)
 
                 if k > 0 && abs(fval - fval_new) < tol
                     return x, fval, norm(gval) <= tol, k
