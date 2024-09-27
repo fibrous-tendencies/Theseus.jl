@@ -13,13 +13,13 @@ end
 Penalize values to be between lb and ub with a smooth approximation of ReLU. 
 Scaling parameters kL and kU can be introduced to make the inflection points of the upper and lower bounds more precise.
 """
-
-function pBounds(p::Vector{Float64}, lb::Vector{Float64}, ub::Vector{Float64})
-    sum(softplus(-10*p - lb)) + sum(softplus(p - ub))
-end
-
 function pBounds(p::Vector{Float64}, lb::Vector{Float64}, ub::Vector{Float64}, kL::Float64, kU::Float64)
     sum(softplus(-10*(p - lb) , kL)) + sum(softplus((p - ub), kU))
+end
+
+function pBounds(q::Vector{Float64}, ub::Vector{Float64}, lb::Vector{Float64})
+    penalty = softplus.(q .- ub, 10.0) .+ softplus.(lb .- q, 10.0)
+    return sum(penalty)
 end
 
 
@@ -91,12 +91,9 @@ end
 Softplus is a smooth approximation of the ReLU function.
 A sharpness parameter k may be included to make the inflection point more precise.
 """
-function softplus(x)
-    log1p.(1 .+ exp.(x))
-end
 
-function softplus(x, k)
-    log1p.(1 .+ exp.(k*x)) ./ k
+function softplus(x, k=1.0)
+    return (1.0 / k) * log1p(exp(k * x))
 end
 
 """

@@ -70,7 +70,7 @@ function FDMoptim!(receiver::Receiver{TParams, TAnchorParams}, ws) where {TParam
                     end
                 end
 
-                loss = lossFunc(xyzfull, lengths, forces, receiver)
+                loss = lossFunc(xyzfull, lengths, forces, receiver, q)
 
                 return loss
             end
@@ -85,7 +85,7 @@ function FDMoptim!(receiver::Receiver{TParams, TAnchorParams}, ws) where {TParam
                 lengths = norm.(eachrow(receiver.C * xyzfull))
                 forces = q .* lengths        
 
-                loss = lossFunc(xyznew, lengths, forces, receiver)
+                loss = lossFunc(xyznew, lengths, forces, receiver, q)
 
                 if !isderiving()
                     ignore_derivatives() do
@@ -184,7 +184,7 @@ function FDMoptim!(receiver::Receiver{TParams, TAnchorParams}, ws) where {TParam
                 lower_bounds,
                 upper_bounds,
                 parameters,
-                Fminbox(LBFGS()),
+                LBFGS(),
                 Optim.Options(
                     iterations = receiver.Params.MaxIter,
                     f_tol = receiver.Params.RelTol,
