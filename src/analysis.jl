@@ -5,6 +5,8 @@ function FDMoptim!(receiver::Receiver{TParams, TAnchorParams}, ws) where {TParam
 
         sp_init = collect(1:receiver.ne)
 
+        print(receiver.XYZf)
+
         # objective function
         if isempty(receiver.Params.Objectives)
 
@@ -42,89 +44,92 @@ function FDMoptim!(receiver::Receiver{TParams, TAnchorParams}, ws) where {TParam
             """
             Objective function, returns a scalar loss value wrt the parameters.
             """
-            function obj_xyz(p)
-                q = p[1:receiver.ne]
+            if !isempty(receiver.AnchorParams.Init)
+                function obj_xyz(p)
+                    q = p[1:receiver.ne]
 
-                newXYZf = reshape(p[receiver.ne+1:end], (:, 3))
-                oldXYZf = receiver.XYZf[receiver.AnchorParams.FAI, :]
+                    newXYZf = reshape(p[receiver.ne+1:end], (:, 3))
+                    oldXYZf = receiver.XYZf[receiver.AnchorParams.FAI, :]
 
-                xyzf = combineSorted(newXYZf, oldXYZf, receiver.AnchorParams.VAI, receiver.AnchorParams.FAI)
+                    xyzf = combineSorted(newXYZf, oldXYZf, receiver.AnchorParams.VAI, receiver.AnchorParams.FAI)
 
-                xyznew = solve_explicit(q, receiver.Cn, receiver.Cf, receiver.Pn, xyzf, sp_init)
+                    xyznew = solve_explicit(q, receiver.Cn, receiver.Cf, receiver.Pn, xyzf, sp_init)
 
-                xyzfull = vcat(xyznew, xyzf)
-                
-                lengths = norm.(eachrow(receiver.C * xyzfull))
-                forces = q .* lengths
+                    xyzfull = vcat(xyznew, xyzf)
+                    
+                    lengths = norm.(eachrow(receiver.C * xyzfull))
+                    forces = q .* lengths
 
-                if !isderiving()
-                    ignore_derivatives() do
-                        Q = deepcopy(q)
-                        if receiver.Params.NodeTrace == true
-                            push!(NodeTrace, deepcopy(xyzfull))
-                        end
-                        
-                    end
-                end
-
-                loss = lossFunc(xyzfull, lengths, forces, receiver)
-
-                return loss
-            end          
-
-            function obj(q)           
-
-                xyznew = solve_explicit(q, receiver.Cn, receiver.Cf, receiver.Pn, receiver.XYZf, sp_init)
-                
-                xyzfull = vcat(xyznew, receiver.XYZf)  
-                
-                lengths = norm.(eachrow(receiver.C * xyzfull))
-                forces = q .* lengths        
-
-                loss = lossFunc(xyznew, lengths, forces, receiver)
-
-                if !isderiving()
-                    ignore_derivatives() do
-                        Q = deepcopy(q)
-                        if receiver.Params.NodeTrace == true
-                            push!(NodeTrace, deepcopy(xyzfull))
-                        end
-
-                        i += 1
-
-                        if receiver.Params.Show && i % receiver.Params.Freq == 0
-                            
-                            push!(iters, Q)
-                            push!(losses, loss)
-
-
+                    if !isderiving()
+                        ignore_derivatives() do
+                            Q = deepcopy(q)
                             if receiver.Params.NodeTrace == true
-                                #send intermediate message
-                                msgout = Dict("Finished" => false,
-                                    "Iter" => i, 
-                                    "Loss" => loss,
-                                    "Q" => Q, 
-                                    "X" => last(NodeTrace)[:,1], 
-                                    "Y" => last(NodeTrace)[:,2], 
-                                    "Z" => last(NodeTrace)[:,3],
-                                    "Losstrace" => losses)
-                            else
-                                msgout = Dict("Finished" => false,
-                                    "Iter" => i, 
-                                    "Loss" => loss,
-                                    "Q" => Q, 
-                                    "X" => xyzfull[:,1], 
-                                    "Y" => xyzfull[:,2], 
-                                    "Z" => xyzfull[:,3],
-                                    "Losstrace" => losses)
+                                push!(NodeTrace, deepcopy(xyzfull))
                             end
-                                
-                            HTTP.WebSockets.send(ws, json(msgout))
+                            
                         end
                     end
+
+                    loss = lossFunc(xyzfull, lengths, forces, receiver)
+
+                    return loss
                 end
                 
-                return loss
+            else
+                function obj(q)           
+
+                    xyznew = solve_explicit(q, receiver.Cn, receiver.Cf, receiver.Pn, receiver.XYZf, sp_init)
+                    
+                    xyzfull = vcat(xyznew, receiver.XYZf)  
+                    
+                    lengths = norm.(eachrow(receiver.C * xyzfull))
+                    forces = q .* lengths        
+
+                    loss = lossFunc(xyznew, lengths, forces, receiver)
+
+                    if !isderiving()
+                        ignore_derivatives() do
+                            Q = deepcopy(q)
+                            if receiver.Params.NodeTrace == true
+                                push!(NodeTrace, deepcopy(xyzfull))
+                            end
+
+                            i += 1
+
+                            if receiver.Params.Show && i % receiver.Params.Freq == 0
+                                
+                                push!(iters, Q)
+                                push!(losses, loss)
+
+
+                                if receiver.Params.NodeTrace == true
+                                    #send intermediate message
+                                    msgout = Dict("Finished" => false,
+                                        "Iter" => i, 
+                                        "Loss" => loss,
+                                        "Q" => Q, 
+                                        "X" => last(NodeTrace)[:,1], 
+                                        "Y" => last(NodeTrace)[:,2], 
+                                        "Z" => last(NodeTrace)[:,3],
+                                        "Losstrace" => losses)
+                                else
+                                    msgout = Dict("Finished" => false,
+                                        "Iter" => i, 
+                                        "Loss" => loss,
+                                        "Q" => Q, 
+                                        "X" => xyzfull[:,1], 
+                                        "Y" => xyzfull[:,2], 
+                                        "Z" => xyzfull[:,3],
+                                        "Losstrace" => losses)
+                                end
+                                    
+                                HTTP.WebSockets.send(ws, json(msgout))
+                            end
+                        end
+                    end
+                    
+                    return loss
+                end
             end
 
             """
@@ -197,7 +202,7 @@ function FDMoptim!(receiver::Receiver{TParams, TAnchorParams}, ws) where {TParam
 
             println("SOLUTION FOUND")
             # PARSING SOLUTION
-            if isnothing(receiver.AnchorParams)
+            if isempty(receiver.AnchorParams.Init)
                 xyz_final = solve_explicit(min, receiver.Cn, receiver.Cf, receiver.Pn, receiver.XYZf, sp_init)
                 xyz_final = vcat(xyz_final, receiver.XYZf)
             else
