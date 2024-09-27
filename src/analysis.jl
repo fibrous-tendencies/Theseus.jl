@@ -3,16 +3,12 @@ import HTTP.WebSockets
 ### optimiztaion
 function FDMoptim!(receiver::Receiver{TParams, TAnchorParams}, ws) where {TParams, TAnchorParams}
 
-        sp_init = collect(1:receiver.ne)
-
-        print(receiver.XYZf)
-
         # objective function
         if isempty(receiver.Params.Objectives)
 
             println("SOLVING")
 
-            xyznew = solve_explicit(receiver.Q, receiver.Cn, receiver.Cf, receiver.Pn, receiver.XYZf, sp_init)
+            xyznew = solve_explicit(receiver.Q, receiver.Cn, receiver.Cf, receiver.Pn, receiver.XYZf)
 
             xyz = zeros(receiver.nn, 3)
             xyz[receiver.N, :] = xyznew
@@ -53,7 +49,7 @@ function FDMoptim!(receiver::Receiver{TParams, TAnchorParams}, ws) where {TParam
 
                 xyzf = combineSorted(newXYZf, oldXYZf, receiver.AnchorParams.VAI, receiver.AnchorParams.FAI)
 
-                xyznew = solve_explicit(q, receiver.Cn, receiver.Cf, receiver.Pn, xyzf, sp_init)
+                xyznew = solve_explicit(q, receiver.Cn, receiver.Cf, receiver.Pn, xyzf)
 
                 xyzfull = vcat(xyznew, xyzf)
                 
@@ -78,7 +74,7 @@ function FDMoptim!(receiver::Receiver{TParams, TAnchorParams}, ws) where {TParam
 
             function obj(q)           
 
-                xyznew = solve_explicit(q, receiver.Cn, receiver.Cf, receiver.Pn, receiver.XYZf, sp_init)
+                xyznew = solve_explicit(q, receiver.Cn, receiver.Cf, receiver.Pn, receiver.XYZf)
                 
                 xyzfull = vcat(xyznew, receiver.XYZf)  
                 
@@ -181,8 +177,6 @@ function FDMoptim!(receiver::Receiver{TParams, TAnchorParams}, ws) where {TParam
             res = Optim.optimize(
                 obj,
                 g!,
-                lower_bounds,
-                upper_bounds,
                 parameters,
                 LBFGS(),
                 Optim.Options(
@@ -202,13 +196,13 @@ function FDMoptim!(receiver::Receiver{TParams, TAnchorParams}, ws) where {TParam
             println("SOLUTION FOUND")
             # PARSING SOLUTION
             if isempty(receiver.AnchorParams.Init)
-                xyz_final = solve_explicit(min, receiver.Cn, receiver.Cf, receiver.Pn, receiver.XYZf, sp_init)
+                xyz_final = solve_explicit(min, receiver.Cn, receiver.Cf, receiver.Pn, receiver.XYZf)
                 xyz_final = vcat(xyz_final, receiver.XYZf)
             else
                 newXYZf = reshape(min[receiver.ne+1:end], (:, 3))
                 oldXYZf = receiver.XYZf[receiver.AnchorParams.FAI, :]
                 XYZf_final = combineSorted(newXYZf, oldXYZf, receiver.AnchorParams.VAI, receiver.AnchorParams.FAI)
-                xyz_final = solve_explicit(min[1:receiver.ne], receiver.Cn, receiver.Cf, receiver.Pn, XYZf_final, sp_init)
+                xyz_final = solve_explicit(min[1:receiver.ne], receiver.Cn, receiver.Cf, receiver.Pn, XYZf_final)
                 xyz_final = vcat(xyz_final, XYZf_final)
             end
 

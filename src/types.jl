@@ -230,8 +230,8 @@ function Receiver(problem::Dict)
     v = Float64.(problem["V"])
 
     C = sparse(i, j, v, ne, nn)
-    Cn = C[:, N_indices]
-    Cf = C[:, F_indices]
+    Cn = @view C[:, N_indices]
+    Cf = @view C[:, F_indices]
 
     # Handle Params
     if haskey(problem, "Parameters")

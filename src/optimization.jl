@@ -16,7 +16,6 @@ function qBounds(q::Vector{Float64}, ub::Vector{Float64}, lb::Vector{Float64})
     return pBounds(q, ub, lb)
 end
 
-
 function computeObjectiveLoss(obj::Objective{TIndices, TValues}, xyznew, lengths, forces) where {TIndices<:AbstractVector{Int64}, TValues}
     if obj.ID == 1
         return obj.W * target(xyznew, obj.Values::Matrix{Float64}, obj.Indices)
