@@ -5,17 +5,19 @@
 ```
 Explicit solver function
 ```
-function solve_explicit(
-    q::Vector{Float64}, #Vector of force densities
-    Cn::SparseMatrixCSC{Int64,Int64}, #Index matrix of free nodes
-    Cf::SparseMatrixCSC{Int64,Int64}, #Index matrix of fixed nodes
-    Pn::Matrix{Float64}, #Matrix of free node loads
-    Nf::Matrix{Float64}, #Matrix of fixed node positions
-    sp_init::Vector{Int64} #Intialization for sparse matrix
-    )
+function solve_explicit(q, Cn, Cf, Pn, Nf, sp_init)
+    println("Cn size: ", size(Cn), ", type: ", typeof(Cn))
+    println("Cf size: ", size(Cf), ", type: ", typeof(Cf))
+    println("Pn size: ", size(Pn), ", type: ", typeof(Pn))
+    println("Nf size: ", size(Nf), ", type: ", typeof(Nf))
+    println("q size: ", size(q), ", type: ", typeof(q))
 
-    Q = sparse(sp_init,sp_init,q) # build diagonal force density Matrix
-    
-    return (Cn' * Q * Cn) \ (Pn - Cn' * Q * Cf * Nf)
+    Q = sparse(sp_init, sp_init, q)
+    println("Q size: ", size(Q), ", type: ", typeof(Q))
+
+    # Perform computation
+    result = (Cn' * Q * Cn) \ (Pn - Cn' * Q * Cf * Nf)
+    return result
 end
+
 

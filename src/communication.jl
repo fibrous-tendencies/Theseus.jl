@@ -1,5 +1,3 @@
-cancel = false
-simulating = false
 counter = 0
 
 function start!(;host = "127.0.0.1", port = 2000)
@@ -13,11 +11,7 @@ function start!(;host = "127.0.0.1", port = 2000)
         # FOR EACH MESSAGE SENT FROM CLIENT
         
         for msg in ws
-            try
-            @async readMSG(msg, ws)
-            catch error
-                println(error)
-            end
+            readMSG(msg, ws)
         end
     end
 end
@@ -33,18 +27,12 @@ function readMSG(msg, ws)
         end
 
         if msg == "cancel"
-            println("Operation Cancelled")
-            global cancel = true
             return
         end
 
-        if simulating == true
-            println("Simulation in progress")
-            return
-        end
 
         # ANALYSIS
-        try
+        #try
             # DESERIALIZE MESSAGE
             problem = JSON.parse(msg)
 
@@ -61,17 +49,15 @@ function readMSG(msg, ws)
             end
             
             # OPTIMIZATION
-            global simulating = true
             @time FDMoptim!(receiver, ws)
            
-        catch error
-            println("INVALID INPUT")
-            println("CHECK PARAMETER BOUNDS")
-            println(error)
-        end
+        #catch error
+            #println("INVALID INPUT")
+            #println("CHECK PARAMETER BOUNDS")
+            #println(error)        
+        #end
         
         println("DONE")
-        global simulating = false
         global counter += 1
         println("Counter $counter")
 end

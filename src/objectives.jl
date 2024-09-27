@@ -1,10 +1,13 @@
 """
 Minimze distances between selected target nodes and their corresponding nodes in the form found network.
 """
-function target(xyz, target, indices)
-    sum((xyz[indices,:] - target).^2)
+function target(xyz, target_values::Matrix{Float64}, indices::Vector{Int64})
+    sum((xyz[indices, :] - target_values).^2)
 end
 
+function target(xyz, target_value::Float64, indices::Vector{Int64})
+    sum((xyz[indices, :] .- target_value).^2)
+end
 
 """
 Penalize values to be between lb and ub with a smooth approximation of ReLU. 

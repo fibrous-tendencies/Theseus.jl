@@ -1,12 +1,12 @@
 import HTTP.WebSockets
 
 ### optimiztaion
-function FDMoptim!(receiver, ws)
+function FDMoptim!(receiver::Receiver{TParams, TAnchorParams}, ws) where {TParams, TAnchorParams}
 
-        sp_init = collect(Int64, range(1, length = receiver.ne))
+        sp_init = collect(1:receiver.ne)
 
         # objective function
-        if isnothing(receiver.Params) || isnothing(receiver.Params.Objectives) || isempty(receiver.Params.Objectives)
+        if isempty(receiver.Params.Objectives)
 
             println("SOLVING")
 
@@ -28,9 +28,7 @@ function FDMoptim!(receiver, ws)
             HTTP.WebSockets.send(ws, json(msgout))
             
         else
-            try
-                
-            
+            #try       
             println("OPTIMIZING")
 
             #trace
@@ -69,7 +67,7 @@ function FDMoptim!(receiver, ws)
                     end
                 end
 
-                loss = lossFunc(xyzfull, lengths, forces, receiver, q)
+                loss = lossFunc(xyzfull, lengths, forces, receiver)
 
                 return loss
             end          
@@ -83,7 +81,7 @@ function FDMoptim!(receiver, ws)
                 lengths = norm.(eachrow(receiver.C * xyzfull))
                 forces = q .* lengths        
 
-                loss = lossFunc(xyznew, lengths, forces, receiver, q)
+                loss = lossFunc(xyznew, lengths, forces, receiver)
 
                 if !isderiving()
                     ignore_derivatives() do
@@ -129,38 +127,6 @@ function FDMoptim!(receiver, ws)
                 return loss
             end
 
-            
-
-            #callback function
-            function cb(loss)
-
-                 if cancel == true
-                    global cancel = false
-                    return true     
-                
-                if receiver.Params.Show 
-                    push!(iters, deepcopy(Q))
-                    push!(losses, loss.value)
-
-                    #send intermediate message
-                    msgout = Dict("Finished" => false,
-                        "Iter" => i, 
-                        "Loss" => loss.value,
-                        "Q" => Q, 
-                        "X" => last(NodeTrace)[:,1], 
-                        "Y" => last(NodeTrace)[:,2], 
-                        "Z" => last(NodeTrace)[:,3],
-                        "Losstrace" => losses)
-                        
-                    HTTP.WebSockets.send(ws, json(msgout))
-                    return false
-                    end
-                else      
-                    return false
-                end
-
-            end
-
             """
             Gradient function, returns a vector of gradients wrt the parameters.
             """
@@ -189,15 +155,37 @@ function FDMoptim!(receiver, ws)
                 obj = obj_xyz
                 parameters = vcat(receiver.Q, receiver.AnchorParams.Init)
             end
-            res = Optim.optimize( 
-                obj, 
+
+            # Define lower and upper bounds
+            len_q = receiver.ne
+            if isempty(receiver.AnchorParams.Init)
+                parameters = receiver.Q
+                lower_bounds = receiver.Params.LB
+                upper_bounds = receiver.Params.UB
+            else
+                parameters = vcat(receiver.Q, receiver.AnchorParams.Init)
+                len_params = length(parameters)
+                len_anchors = len_params - len_q
+
+                lower_bounds = vcat(receiver.Params.LB, fill(-Inf, len_anchors))
+                upper_bounds = vcat(receiver.Params.UB, fill(Inf, len_anchors))
+            end
+
+
+
+            # Use Fminbox to enforce bounds
+            res = Optim.optimize(
+                obj,
                 g!,
+                lower_bounds,
+                upper_bounds,
                 parameters,
-                LBFGS(),                
+                Fminbox(LBFGS()),
                 Optim.Options(
                     iterations = receiver.Params.MaxIter,
                     f_tol = receiver.Params.RelTol,
-                    ))            
+                )
+            )    
 
             min = Optim.minimizer(res)
     
@@ -234,8 +222,8 @@ function FDMoptim!(receiver, ws)
 
         HTTP.WebSockets.send(ws, json(msgout))
 
-        catch error
-            println(error)
-        end
+        #catch error
+        #    println(error)
+        #end
     end
 end
