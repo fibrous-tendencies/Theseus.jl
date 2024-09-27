@@ -4,12 +4,12 @@ using LinearAlgebra
 using Statistics
 using SparseArrays
 using Optim
-using Zygote
-using Zygote: @adjoint
 using JSON
 using HTTP
 using LineSearches
 using ChainRulesCore
+using Enzyme
+using Enzyme.EnzymeCore
 
 include("FDM.jl")
 include("types.jl")

@@ -83,7 +83,7 @@ function FDMoptim!(receiver::Receiver{TParams, TAnchorParams}, ws) where {TParam
 
                 loss = lossFunc(xyznew, lengths, forces, receiver, q)
 
-                if !isderiving()
+                #= if !isderiving()
                     ignore_derivatives() do
                         Q = deepcopy(q)
                         if receiver.Params.NodeTrace == true
@@ -122,7 +122,7 @@ function FDMoptim!(receiver::Receiver{TParams, TAnchorParams}, ws) where {TParam
                             HTTP.WebSockets.send(ws, json(msgout))
                         end
                     end
-                end
+                end =#
                 
                 return loss
             end
@@ -131,13 +131,30 @@ function FDMoptim!(receiver::Receiver{TParams, TAnchorParams}, ws) where {TParam
             Gradient function, returns a vector of gradients wrt the parameters.
             """
 
-            function g!(G, θ)
+#=             function g!(G, θ)
                 grad = gradient(θ) do q
                    obj(q)
-                end
+                endstat
                 G .= grad[1]
             end
+             =#
             
+             # Define the gradient function using Enzyme
+             function g!(G::Vector{Float64}, q::Vector{Float64})
+                # Create a gradient accumulator for q
+                q̄ = zeros(size(q))
+            
+                # Call Enzyme.autodiff with proper annotations
+                Enzyme.autodiff(
+                    Enzyme.Reverse,            # Differentiation mode
+                    Enzyme.Const(obj),         # Annotate obj as constant
+                    Enzyme.Duplicated(q, q̄)   # q is the active variable, q̄ will hold the gradient
+                )
+            
+                # Copy the computed gradient into G
+                G .= q̄
+            end
+
             #todo add explicit gradient for distance conditions from Schek
             #to use when draping only
             function drape!(G, θ)
