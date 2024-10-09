@@ -1,48 +1,35 @@
 struct Objective
     ID::Int64
     W::Float64
-    Indices::Union{Vector{Int64}, Int64}
-    Values::Union{Vector{Float64}, Matrix{Float64}, Float64, Nothing}
+    Indices::Vector{Int64}
+    Values::AbstractMatrix{Float64}  # Using abstract type for flexibility
 
-    function Objective(obj::Dict, ne::Int64, nn::Int64, N, F)
+    function Objective(obj::Dict{String, Any}, ne::Int64, nn::Int64, N::Vector{Int64}, F::Vector{Int64})
         id = obj["OBJID"]
         w = Float64(obj["Weight"])
 
-        #If the objective is a global objective, then the indices are -1
-        if  obj["Indices"][1] == -1
-            if id == 1
-                indices = N
-            elseif id == 0
-                indices = F
-            else
-                indices = collect(Int64, range(1, ne))
-            end        
+        # Determine indices
+        if obj["Indices"][1] == -1
+            indices = id == 1 ? N : (id == 0 ? F : collect(1:ne))
         else
             indices = Int64.(obj["Indices"]) .+ 1
         end
 
-        #Vector form of values
-        if haskey(obj, "Values")
+        # Determine values
+        values = if haskey(obj, "Values")
             if obj["Indices"][1] == -1
-                values = ones(ne) .* Float64.(obj["Values"])
+                ones(ne) .* Float64.(obj["Values"])
             else
-                values = Float64.(obj["Values"])
+                Float64.(obj["Values"])
             end
-        
-        #Matrix form of values. All point based objectives have more than one value and 
-        #typically not repeated values, so we assume that the values are given.
         elseif haskey(obj, "Points")
-            values = obj["Points"]
-            values = reduce(hcat, values)
-            values = convert(Matrix{Float64}, values')
-            
-        #Some objectives don't have values.
+            convert(Matrix{Float64}, reduce(hcat, obj["Points"])')
         else
-                values = nothing
+            zeros(ne, 1)  # Using a zero matrix instead of `nothing` for type stability
         end
 
         new(id, w, indices, values)
-    end        
+    end
 end
 
 struct Parameters
@@ -67,20 +54,20 @@ struct Parameters
         return objectives
     end
 
-    function Parameters(parameters::Dict, ne::Int64, nn::Int64, N::Vector{Int64}, F::Vector{Int64})
-        objectives = Objectives(parameters["Objectives"], ne, nn, N, F)
+    function Parameters(parameters::Dict{String, Any}, ne::Int64, nn::Int64, N::Vector{Int64}, F::Vector{Int64})
+        objectives = [Objective(obj, ne, nn, N, F) for obj in parameters["Objectives"]]
         abstol = Float64(parameters["AbsTol"])
         reltol = Float64(parameters["RelTol"])
         freq = Int64(parameters["UpdateFrequency"])
         maxiter = Int64(parameters["MaxIterations"])
         show = Bool(parameters["ShowIterations"])
 
-        ub = parameters["UpperBound"] .* ones(ne)
-        lb = parameters["LowerBound"] .* ones(ne)
+        ub = fill(Float64(parameters["UpperBound"]), ne)
+        lb = fill(Float64(parameters["LowerBound"]), ne)
 
-        nodeTrace = parameters["NodeTrace"]
+        nodeTrace = Bool(parameters["NodeTrace"])
 
-        return new(
+        new(
             objectives,
             abstol,
             reltol,
@@ -89,41 +76,36 @@ struct Parameters
             show,
             ub,
             lb,
-            nodeTrace)
+            nodeTrace
+        )
     end
 end
 
 struct AnchorParameters
     VAI::Vector{Int64}
     FAI::Vector{Int64}
-
     Init::Vector{Float64}
 
-    function AnchorParameters(anchors::Vector{Any}, var::Vector{Any}, fix::Vector{Any})
+    function AnchorParameters(anchors::Vector{Dict{String, Any}}, var::Vector{Int}, fix::Vector{Int})
         variableAnchors = Int64.(var) .+ 1
         fixedAnchors = Int64.(fix) .+ 1
 
-        init = []
-
+        init = Float64[]
         for anchor in anchors
-            push!(init, anchor["InitialX"])
-            push!(init, anchor["InitialY"])
-            push!(init, anchor["InitialZ"])
+            push!(init, anchor["InitialX"], anchor["InitialY"], anchor["InitialZ"])
         end
 
-        return new(
-            variableAnchors,
-            fixedAnchors,
-            init)
+        new(variableAnchors, fixedAnchors, init)
     end
 end
 
-struct Receiver
+using SparseArrays
 
-    #FORCE DENSITY
+struct Receiver
+    # FORCE DENSITY
     Q::Vector{Float64}
 
-    #NETWORK INFORMATION
+    # NETWORK INFORMATION
     N::Vector{Int64}
     F::Vector{Int64}
 
@@ -138,106 +120,76 @@ struct Receiver
     nn::Int64
 
     Params::Union{Parameters, Nothing}
-    
     AnchorParams::Union{AnchorParameters, Nothing}
 
+    function Receiver(problem::Dict{String, Any})
+        # Anchor Geometry
+        xyzf = convert(Matrix{Float64}, reduce(hcat, problem["XYZf"])')
 
-    #constructor
-    function Receiver(problem::Dict)
-        #anchor geometry
-        xyzf = problem["XYZf"]
-        xyzf = reduce(hcat, xyzf)
-        xyzf = convert(Matrix{Float64}, xyzf')
+        # Global Info
+        ne = Int64(problem["Network"]["Graph"]["Ne"])
+        nn = Int64(problem["Network"]["Graph"]["Nn"])
 
-        # global info
-        ne = Int(problem["Network"]["Graph"]["Ne"])
-        nn = Int(problem["Network"]["Graph"]["Nn"])
+        # Initial Force Densities
+        q = length(problem["Q"]) == 1 ? fill(Float64(problem["Q"][1]), ne) : Float64.(problem["Q"])
+        q = length(q) == ne ? q : fill(1.0, ne)  # Ensure length matches `ne`
 
-        # initial force densities
-        if length(problem["Q"]) == 1
-            q = Float64.(repeat(problem["Q"], ne))
-        elseif length(problem["Q"]) == ne
-            q = Float64.(problem["Q"])
-        else
-            q = repeat(1.0, ne)
-        end        
+        # Free/Fixed Nodes
+        N = collect(1:length(problem["Network"]["FreeNodes"]))
+        F = collect(length(N)+1:length(problem["Network"]["FixedNodes"]) + length(N))
 
-        # free/fixed
-        N = Int.(problem["Network"]["FreeNodes"]) .+ 1
-        N = collect(range(1, length = length(N)))
-        F = Int.(problem["Network"]["FixedNodes"]) .+ 1 
-        F = collect(range(length(N)+1, length = length(F)))   
+        # Loads
+        GH_p = convert(Matrix{Float64}, reduce(hcat, problem["P"])')
+        p = zeros(nn, 3)
 
-        # loads
-        GH_p = problem["P"]
-        GH_p = reduce(hcat, GH_p)
-        GH_p = convert(Matrix{Float64}, GH_p')
-
-        LN = Int[]
-        # load nodes
         if haskey(problem, "LoadNodes")
-            LN = Int.(problem["LoadNodes"]) .+ 1     
-            #If the number of given load vectors matches the number of 
-            #node indices given in the problem, then we assume that the
-            #load vectors are given in the same order as the node indices.
+            LN = Int64.(problem["LoadNodes"]) .+ 1
             if length(LN) == size(GH_p, 1)
-                p = zeros(nn, 3)
                 p[LN, :] = GH_p
-            elseif length(LN) > 1 && size(GH_p, 1) == 1         
-                p = zeros(nn, 3)
-                p[LN, :] = repeat(GH_p, length(LN))
+            elseif length(LN) > 1 && size(GH_p, 1) == 1
+                p[LN, :] .= GH_p[1, :]
             else
-                p = zeros(nn, 3)
-                println("Warning: Number of load vectors must match number of load nodes or be 1.")
-                println("Using zero loads.")
+                @warn "Number of load vectors must match number of load nodes or be 1. Using zero loads."
             end
             Pn = p[N, :]
         else
             if size(GH_p, 1) == 1
-                p = repeat(GH_p, length(N))
+                p .= GH_p[1, :]
             elseif size(GH_p, 1) == length(N)
-                p = GH_p
+                p .= GH_p
             else
-                println("Warning: Number of load vectors must match number of load nodes or be 1.")
-                println("Using zero loads.")
-                p = zeros(length(N), 3)
+                @warn "Number of load vectors must match number of load nodes or be 1. Using zero loads."
             end
-            Pn = p      
+            Pn = p
         end
 
-        # connectivity
-        i = Int.(problem["I"]) .+ 1
-        j = Int.(problem["J"]) .+ 1
-        v = Int.(problem["V"])
+        # Connectivity
+        i = Int64.(problem["I"]) .+ 1
+        j = Int64.(problem["J"]) .+ 1
+        v = Int64.(problem["V"])
 
         C = sparse(i, j, v, ne, nn)
         Cn = C[:, 1:length(N)]
         Cf = C[:, length(N)+1:end]
 
-        if haskey(problem, "Parameters")
-            p = Parameters(problem["Parameters"], ne, nn, N, F)
-
-            #prevent the force densities from being outside the bounds
-            q = clamp(q, p.LB, p.UB)
+        # Parameters
+        Params = haskey(problem, "Parameters") ? Parameters(problem["Parameters"], ne, nn, N, F) : nothing
+        if Params !== nothing
+            q .= clamp.(q, Params.LB, Params.UB)
         else
-            println("No optimization parameters provided.")
-            println("Running FDM using given force densities only.")
-            p = nothing
+            @info "No optimization parameters provided. Running FDM using given force densities only."
         end
 
-        if haskey(problem, "VariableAnchors")
-            varAnchors = problem["NodeIndex"]
-            fixAnchors = problem["FixedAnchorIndices"]
-            ap = AnchorParameters(problem["VariableAnchors"], varAnchors, fixAnchors)
-        else
-            println("No anchor parameters provided.")
-            println("Using only given fixed node positions.")
-            ap = nothing
+        # Anchor Parameters
+        AnchorParams = haskey(problem, "VariableAnchors") ? 
+            AnchorParameters(problem["VariableAnchors"], problem["NodeIndex"], problem["FixedAnchorIndices"]) : 
+            nothing
+
+        if AnchorParams === nothing
+            @info "No anchor parameters provided. Using only given fixed node positions."
         end
 
-        
-
-        return new(
+        new(
             q, 
             N, 
             F,
@@ -248,7 +200,8 @@ struct Receiver
             Cf,
             ne,
             nn,
-            p,
-            ap)        
+            Params,
+            AnchorParams
+        )
     end
 end
