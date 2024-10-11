@@ -88,39 +88,21 @@ function FDMoptim!(receiver, ws)
                 if !isderiving()
                     ignore_derivatives() do
                         Q = deepcopy(q)
-                        if receiver.Params.NodeTrace == true
-                            push!(NodeTrace, deepcopy(xyzfull))
-                        end
-
-                        i += 1
-
                         if receiver.Params.Show && i % receiver.Params.Freq == 0
                             
-                            push!(iters, Q)
-                            push!(losses, loss)
-
-
-                            if receiver.Params.NodeTrace == true
-                                #send intermediate message
-                                msgout = Dict("Finished" => false,
-                                    "Iter" => i, 
-                                    "Loss" => loss,
-                                    "Q" => Q, 
-                                    "X" => last(NodeTrace)[:,1], 
-                                    "Y" => last(NodeTrace)[:,2], 
-                                    "Z" => last(NodeTrace)[:,3],
-                                    "Losstrace" => losses)
-                            else
-                                msgout = Dict("Finished" => false,
-                                    "Iter" => i, 
-                                    "Loss" => loss,
-                                    "Q" => Q, 
-                                    "X" => xyzfull[:,1], 
-                                    "Y" => xyzfull[:,2], 
-                                    "Z" => xyzfull[:,3],
-                                    "Losstrace" => losses)
+                            # Check if loss is not null before updating losses
+                            if loss !== nothing
+                                push!(losses, loss)
                             end
-                                
+                            # Send message with Losstrace
+                            msgout = Dict("Finished" => false,
+                                "Iter" => i, 
+                                "Loss" => loss,
+                                "Q" => Q, 
+                                "X" => xyzfull[:,1], 
+                                "Y" => xyzfull[:,2], 
+                                "Z" => xyzfull[:,3],
+                                "Losstrace" => losses)
                             HTTP.WebSockets.send(ws, json(msgout))
                         end
                     end
@@ -139,10 +121,11 @@ function FDMoptim!(receiver, ws)
                     return true     
                 
                 if receiver.Params.Show 
-                    push!(iters, deepcopy(Q))
-                    push!(losses, loss.value)
-
-                    #send intermediate message
+                    # Check if loss.value is not null before updating losses
+                    if loss.value !== nothing
+                        push!(losses, loss.value)
+                    end
+                    # Send message with Losstrace
                     msgout = Dict("Finished" => false,
                         "Iter" => i, 
                         "Loss" => loss.value,
