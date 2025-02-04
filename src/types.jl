@@ -75,8 +75,8 @@ struct Parameters
         maxiter = Int64(parameters["MaxIterations"])
         show = Bool(parameters["ShowIterations"])
 
-        ub = parameters["UpperBound"] .* ones(ne)
-        lb = parameters["LowerBound"] .* ones(ne)
+        ub = Float64.(parameters["UpperBound"])
+        lb = Float64.(parameters["LowerBound"])
 
         nodeTrace = parameters["NodeTrace"]
 

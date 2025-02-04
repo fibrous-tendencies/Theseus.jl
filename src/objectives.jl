@@ -12,11 +12,11 @@ Scaling parameters kL and kU can be introduced to make the inflection points of 
 """
 
 function pBounds(p::Vector{Float64}, lb::Vector{Float64}, ub::Vector{Float64})
-    sum(softplus(-10*p - lb)) + sum(softplus(p - ub))
+    sum(softplus(-(p - lb))) + sum(softplus((p - ub)))
 end
 
 function pBounds(p::Vector{Float64}, lb::Vector{Float64}, ub::Vector{Float64}, kL::Float64, kU::Float64)
-    sum(softplus(-10*(p - lb) , kL)) + sum(softplus((p - ub), kU))
+    sum(softplus(-(p - lb) , kL)) + sum(softplus((p - ub), kU))
 end
 
 

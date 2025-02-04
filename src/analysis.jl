@@ -87,6 +87,7 @@ function FDMoptim!(receiver, ws)
 
                 if !isderiving()
                     ignore_derivatives() do
+                        #println("Loss: ", loss)
                         Q = deepcopy(q)
                         if receiver.Params.NodeTrace == true
                             push!(NodeTrace, deepcopy(xyzfull))
@@ -170,6 +171,8 @@ function FDMoptim!(receiver, ws)
                    obj(q)
                 end
                 G .= grad[1]
+                #@show G
+
             end
             
             #todo add explicit gradient for distance conditions from Schek
