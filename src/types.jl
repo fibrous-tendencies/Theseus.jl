@@ -25,8 +25,14 @@ struct Objective
         if haskey(obj, "Values")
             if obj["Indices"][1] == -1
                 values = ones(ne) .* Float64.(obj["Values"])
-            else
+            elseif length(obj["Values"]) == length(obj["Indices"])
                 values = Float64.(obj["Values"])
+            elseif length(obj["Values"]) == 1 && length(obj["Indices"]) > 1
+                values = ones(length(obj["Indices"])) .* Float64.(obj["Values"][1])
+            else
+                println("Warning: Number of values must match number of indices or be 1.")
+                println("Using first value for all values.")
+                values = ones(ne) .* Float64.(obj["Values"][1])
             end
         
         #Matrix form of values. All point based objectives have more than one value and 
@@ -35,11 +41,13 @@ struct Objective
             values = obj["Points"]
             values = reduce(hcat, values)
             values = convert(Matrix{Float64}, values')
+        
             
         #Some objectives don't have values.
         else
                 values = nothing
         end
+
 
         new(id, w, indices, values)
     end        
@@ -75,8 +83,8 @@ struct Parameters
         maxiter = Int64(parameters["MaxIterations"])
         show = Bool(parameters["ShowIterations"])
 
-        ub = parameters["UpperBound"] .* ones(ne)
-        lb = parameters["LowerBound"] .* ones(ne)
+        ub = Float64.(parameters["UpperBound"])
+        lb = Float64.(parameters["LowerBound"])
 
         nodeTrace = parameters["NodeTrace"]
 

@@ -74,7 +74,8 @@ function FDMoptim!(receiver, ws)
                 return loss
             end          
 
-            function obj(q)           
+            function obj(q)
+                #q = clamp.(q, receiver.Params.LB, receiver.Params.UB)           
 
                 xyznew = solve_explicit(q, receiver.Cn, receiver.Cf, receiver.Pn, receiver.XYZf, sp_init)
                 
@@ -87,12 +88,38 @@ function FDMoptim!(receiver, ws)
 
                 if !isderiving()
                     ignore_derivatives() do
+                        #println("Loss: ", loss)
                         Q = deepcopy(q)
                         if receiver.Params.Show && i % receiver.Params.Freq == 0
                             
-                            # Check if loss is not null before updating losses
-                            if loss !== nothing
+                            push!(iters, Q)
+                            if loss != Inf
                                 push!(losses, loss)
+                            else
+                                loss = -1.0
+                                push!(losses, loss)
+                            end
+
+
+                            if receiver.Params.NodeTrace == true
+                                #send intermediate message
+                                msgout = Dict("Finished" => false,
+                                    "Iter" => i, 
+                                    "Loss" => loss,
+                                    "Q" => Q, 
+                                    "X" => last(NodeTrace)[:,1], 
+                                    "Y" => last(NodeTrace)[:,2], 
+                                    "Z" => last(NodeTrace)[:,3],
+                                    "Losstrace" => losses)
+                            else
+                                msgout = Dict("Finished" => false,
+                                    "Iter" => i, 
+                                    "Loss" => loss,
+                                    "Q" => Q, 
+                                    "X" => xyzfull[:,1], 
+                                    "Y" => xyzfull[:,2], 
+                                    "Z" => xyzfull[:,3],
+                                    "Losstrace" => losses)
                             end
                             # Send message with Losstrace
                             msgout = Dict("Finished" => false,
@@ -111,39 +138,6 @@ function FDMoptim!(receiver, ws)
                 return loss
             end
 
-            
-
-            #callback function
-            function cb(loss)
-
-                 if cancel == true
-                    global cancel = false
-                    return true     
-                
-                if receiver.Params.Show 
-                    # Check if loss.value is not null before updating losses
-                    if loss.value !== nothing
-                        push!(losses, loss.value)
-                    end
-                    # Send message with Losstrace
-                    msgout = Dict("Finished" => false,
-                        "Iter" => i, 
-                        "Loss" => loss.value,
-                        "Q" => Q, 
-                        "X" => last(NodeTrace)[:,1], 
-                        "Y" => last(NodeTrace)[:,2], 
-                        "Z" => last(NodeTrace)[:,3],
-                        "Losstrace" => losses)
-                        
-                    HTTP.WebSockets.send(ws, json(msgout))
-                    return false
-                    end
-                else      
-                    return false
-                end
-
-            end
-
             """
             Gradient function, returns a vector of gradients wrt the parameters.
             """
@@ -153,6 +147,8 @@ function FDMoptim!(receiver, ws)
                    obj(q)
                 end
                 G .= grad[1]
+                #@show G
+
             end
             
             #todo add explicit gradient for distance conditions from Schek
@@ -176,7 +172,8 @@ function FDMoptim!(receiver, ws)
                 obj, 
                 g!,
                 parameters,
-                LBFGS(),                
+                #LBFGS(),
+                ConjugateGradient(),                
                 Optim.Options(
                     iterations = receiver.Params.MaxIter,
                     f_tol = receiver.Params.RelTol,
