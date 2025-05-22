@@ -1,7 +1,7 @@
 import HTTP.WebSockets
 
 ### optimiztaion
-function FDMoptim!(receiver, ws)
+function FDMoptim!(receiver, ws; max_norm::Float64=1.0)
 
         sp_init = collect(Int64, range(1, length = receiver.ne))
 
@@ -133,6 +133,7 @@ function FDMoptim!(receiver, ws)
                             HTTP.WebSockets.send(ws, json(msgout))
                         end
                     end
+                    i += 1
                 end
                 
                 return loss
@@ -141,14 +142,13 @@ function FDMoptim!(receiver, ws)
             """
             Gradient function, returns a vector of gradients wrt the parameters.
             """
+            max_norm = 1.0
 
             function g!(G, θ)
                 grad = gradient(θ) do q
                    obj(q)
                 end
                 G .= grad[1]
-                #@show G
-
             end
             
             #todo add explicit gradient for distance conditions from Schek
@@ -172,8 +172,8 @@ function FDMoptim!(receiver, ws)
                 obj, 
                 g!,
                 parameters,
-                #LBFGS(),
-                ConjugateGradient(),                
+                LBFGS(),
+                #ConjugateGradient(),                
                 Optim.Options(
                     iterations = receiver.Params.MaxIter,
                     f_tol = receiver.Params.RelTol,
