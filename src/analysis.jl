@@ -90,12 +90,6 @@ function FDMoptim!(receiver, ws)
                     ignore_derivatives() do
                         #println("Loss: ", loss)
                         Q = deepcopy(q)
-                        if receiver.Params.NodeTrace == true
-                            push!(NodeTrace, deepcopy(xyzfull))
-                        end
-
-                        i += 1
-
                         if receiver.Params.Show && i % receiver.Params.Freq == 0
                             
                             push!(iters, Q)
@@ -127,7 +121,15 @@ function FDMoptim!(receiver, ws)
                                     "Z" => xyzfull[:,3],
                                     "Losstrace" => losses)
                             end
-                                
+                            # Send message with Losstrace
+                            msgout = Dict("Finished" => false,
+                                "Iter" => i, 
+                                "Loss" => loss,
+                                "Q" => Q, 
+                                "X" => xyzfull[:,1], 
+                                "Y" => xyzfull[:,2], 
+                                "Z" => xyzfull[:,3],
+                                "Losstrace" => losses)
                             HTTP.WebSockets.send(ws, json(msgout))
                         end
                     end
@@ -135,7 +137,6 @@ function FDMoptim!(receiver, ws)
                 
                 return loss
             end
-
 
             """
             Gradient function, returns a vector of gradients wrt the parameters.
