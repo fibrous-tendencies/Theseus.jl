@@ -74,7 +74,8 @@ function FDMoptim!(receiver, ws)
                 return loss
             end          
 
-            function obj(q)           
+            function obj(q)
+                #q = clamp.(q, receiver.Params.LB, receiver.Params.UB)           
 
                 xyznew = solve_explicit(q, receiver.Cn, receiver.Cf, receiver.Pn, receiver.XYZf, sp_init)
                 
@@ -98,7 +99,12 @@ function FDMoptim!(receiver, ws)
                         if receiver.Params.Show && i % receiver.Params.Freq == 0
                             
                             push!(iters, Q)
-                            push!(losses, loss)
+                            if loss != Inf
+                                push!(losses, loss)
+                            else
+                                loss = -1.0
+                                push!(losses, loss)
+                            end
 
 
                             if receiver.Params.NodeTrace == true
@@ -130,37 +136,6 @@ function FDMoptim!(receiver, ws)
                 return loss
             end
 
-            
-
-            #callback function
-            function cb(loss)
-
-                 if cancel == true
-                    global cancel = false
-                    return true     
-                
-                if receiver.Params.Show 
-                    push!(iters, deepcopy(Q))
-                    push!(losses, loss.value)
-
-                    #send intermediate message
-                    msgout = Dict("Finished" => false,
-                        "Iter" => i, 
-                        "Loss" => loss.value,
-                        "Q" => Q, 
-                        "X" => last(NodeTrace)[:,1], 
-                        "Y" => last(NodeTrace)[:,2], 
-                        "Z" => last(NodeTrace)[:,3],
-                        "Losstrace" => losses)
-                        
-                    HTTP.WebSockets.send(ws, json(msgout))
-                    return false
-                    end
-                else      
-                    return false
-                end
-
-            end
 
             """
             Gradient function, returns a vector of gradients wrt the parameters.
@@ -196,7 +171,8 @@ function FDMoptim!(receiver, ws)
                 obj, 
                 g!,
                 parameters,
-                LBFGS(),                
+                #LBFGS(),
+                ConjugateGradient(),                
                 Optim.Options(
                     iterations = receiver.Params.MaxIter,
                     f_tol = receiver.Params.RelTol,
